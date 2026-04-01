@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <style>
+    body { font-family: 'Microsoft JhengHei', sans-serif; display: flex; flex-direction: column; align-items: center; background: #f0f2f5; margin: 0; padding: 20px; }
+    .video-container { width: 100%; max-width: 500px; background: #000; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.3); position: relative; }
+    video { width: 100%; display: block; transform: scaleX(-1); /* 鏡像顯示，符合自拍習慣 */ }
+    canvas { display: none; } /* 隱藏繪圖板 */
+    
+    .controls { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+    .btn { padding: 12px 24px; border: none; border-radius: 50px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
+    .btn-start { background: #28a745; color: white; }
+    .btn-snap { background: #007bff; color: white; }
+    .btn-switch { background: #6c757d; color: white; }
+    .btn:disabled { background: #ccc; cursor: not-allowed; }
+    
+    #status { margin-top: 15px; color: #666; font-size: 14px; }
+    #photoPreview { margin-top: 20px; width: 200px; border: 3px solid white; border-radius: 8px; display: none; }
+  </style>
+</head>
+<body>
+
+  <h2>設備鏡頭存取系統</h2>
+
+  <div class="video-container">
+    <video id="video" autoplay playsinline></video>
+  </div>
+
+  <div class="controls">
+    <button id="startBtn" class="btn btn-start">開啟鏡頭</button>
+    <button id="switchBtn" class="btn btn-switch" disabled>切換鏡頭</button>
+    <button id="snapBtn" class="btn btn-snap" disabled>拍照截圖</button>
+  </div>
+
+  <p id="status">等待授權鏡頭...</p>
+  
+  <canvas id="canvas"></canvas>
+  <img id="photoPreview" alt="截圖預覽">
+
+  <script>
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const snapBtn = document.getElementById('snapBtn');
+    const startBtn = document.getElementById('startBtn');
+    const switchBtn = document.getElementById('switchBtn');
+    const status = document.getElementById('status');
+    const photoPreview = document.getElementById('photoPreview');
+
+    let currentStream = null;
+    let facingMode = "user"; // "user" 是前鏡頭, "environment" 是後鏡頭
+
+    // 停止目前的串流
+    function stopCurrentStream() {
+      if (currentStream) {
+        currentStream.getTracks().forEach(track => track.stop());
+      }
+    }
+
+    // 啟動鏡頭
+    async function initCamera() {
+      stopCurrentStream();
+      status.innerText = "正在嘗試啟動鏡頭...";
+      
+      const constraints = {
+        video: { facingMode: facingMode },
+        audio: false
+      };
+
+      try {
+        currentStream = await navigator.mediaDevices.getUserMedia(constraints);
+        video.srcObject = currentStream;
+        
+        // 成功啟動後啟用按鈕
+        snapBtn.disabled = false;
+        switchBtn.disabled = false;
+        startBtn.innerText = "重新啟動";
+        status.innerText = "鏡頭運作中 (" + (facingMode === "user" ? "前鏡頭" : "後鏡頭") + ")";
+      } catch (err) {
+        console.error("鏡頭啟動失敗: ", err);
+        status.innerText = "錯誤: 無法存取鏡頭。請確保已開啟 HTTPS 並允許權限。";
+      }
+    }
+
+    // 拍照功能
+    function takeSnapshot() {
+      const context = canvas.getContext('2d');
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // 將影片畫面繪製到畫布上
+      context.translate(canvas.width, 0);
+      context.scale(-1, 1); // 保持鏡像修正
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      const dataURL = canvas.toDataURL('image/png');
+      photoPreview.src = dataURL;
+      photoPreview.style.display = "block";
+      status.innerText = "已完成截圖！";
+    }
+
+    // 事件監聽
+    startBtn.addEventListener('click', initCamera);
+    
+    snapBtn.addEventListener('click', takeSnapshot);
+
+    switchBtn.addEventListener('click', () => {
+      facingMode = (facingMode === "user" ? "environment" : "user");
+      initCamera();
+    });
+
+  </script>
+</body>
+</html>
